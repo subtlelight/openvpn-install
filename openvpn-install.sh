@@ -462,14 +462,14 @@ $ip6t -A INPUT -p tcp --dport 443 -j ACCEPT
 
 # OpenVPN
 $ipt -t nat -A POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to "$ip"
-$ipt -I INPUT -p "protocol" --dport "$port" -j ACCEPT
+$ipt -I INPUT -p "$protocol" --dport "$port" -j ACCEPT
 $ipt -I FORWARD -s 10.8.0.0/24 -j ACCEPT
 $ipt -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
 #$ipt -t nat -D POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $ip
-#$ipt -D INPUT -p "protocol" --dport "$port" -j ACCEPT
+#$ipt -D INPUT -p "$protocol" --dport "$port" -j ACCEPT
 #$ipt -D FORWARD -s 10.8.0.0/24 -j ACCEPT
 #$ipt -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
-$ip6t -A INPUT -p "protocol" --dport "$port" -j ACCEPT
+$ip6t -A INPUT -p "$protocol" --dport "$port" -j ACCEPT
 $ip6t -t nat -A POSTROUTING -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:1194::/64 -j SNAT --to $ip6
 $ip6t -I FORWARD -s fddd:1194:1194:1194::/64 -j ACCEPT
 $ip6t -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT

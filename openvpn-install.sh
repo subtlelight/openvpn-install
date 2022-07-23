@@ -211,7 +211,7 @@ if [[ ! -e /etc/openvpn/server/server.conf ]]; then
 			echo "firewalld, which is required to manage routing tables, will also be installed."
 		elif [[ "$os" == "debian" || "$os" == "ubuntu" ]]; then
 			# iptables is way less invasive than firewalld so no warning is given
-			firewall="iptables"
+			firewall="iptables iptables-persistent netfilter-persistent"
 		fi
 	fi
 	read -n1 -r -p "Press any key to continue..."
@@ -223,7 +223,7 @@ LimitNPROC=infinity" > /etc/systemd/system/openvpn-server@server.service.d/disab
 	fi
 	if [[ "$os" = "debian" || "$os" = "ubuntu" ]]; then
 		apt-get update
-		apt-get install -y openvpn openssl ca-certificates $firewall
+		apt-get install -y openvpn openssl ca-certificates $firewall 
 	elif [[ "$os" = "centos" ]]; then
 		yum install -y epel-release
 		yum install -y openvpn openssl ca-certificates tar $firewall
@@ -332,19 +332,154 @@ persist-key
 persist-tun
 verb 3
 #crl-verify crl.pem" >> /etc/openvpn/server/server.conf
-#	if [[ "$protocol" = "udp" ]]; then
-#		echo "explicit-exit-notify" >> /etc/openvpn/server/server.conf
-#	fi
-#	# Enable net.ipv4.ip_forward for the system
-#	echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-openvpn-forward.conf
-#	# Enable without waiting for a reboot or service restart
-#	echo 1 > /proc/sys/net/ipv4/ip_forward
-#	if [[ -n "$ip6" ]]; then
-#		# Enable net.ipv6.conf.all.forwarding for the system
-#		echo "net.ipv6.conf.all.forwarding=1" >> /etc/sysctl.d/99-openvpn-forward.conf
-#		# Enable without waiting for a reboot or service restart
-#		echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
-#	fi
+	if [[ "$protocol" = "udp" ]]; then
+		echo "explicit-exit-notify" >> /etc/openvpn/server/server.conf
+	fi
+	# Enable net.ipv4.ip_forward for the system
+	echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-openvpn-forward.conf
+	# Enable without waiting for a reboot or service restart
+	echo 1 > /proc/sys/net/ipv4/ip_forward
+	if [[ -n "$ip6" ]]; then
+		# Enable net.ipv6.conf.all.forwarding for the system
+		echo "net.ipv6.conf.all.forwarding=1" >> /etc/sysctl.d/99-openvpn-forward.conf
+		# Enable without waiting for a reboot or service restart
+		echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
+	fi
+
+
+mkdir /etc/network/if-up.d
+touch /etc/network/if-up.d/iptables-rules
+echo 'ipt=/sbin/iptables
+ip6t=/sbin/ip6tables
+#ip=$(ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}')
+ip=157.90.144.63
+#ip6=$(ip -6 addr | grep 'inet6 [23]' | cut -d '/' -f 1 | grep -oE '([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}' | sed -n "$ip6_numbe>
+
+sysctl -w net.ipv4.tcp_syncookies=1
+sysctl -w net.ipv4.icmp_echo_ignore_broadcasts=1
+sysctl -w net.ipv4.icmp_ignore_bogus_error_responses=1
+sysctl -w net.ipv4.conf.all.accept_redirects=0
+sysctl -w net.ipv4.conf.all.send_redirects=0
+sysctl -w net.ipv4.conf.all.accept_source_route=0
+sysctl -w net.ipv4.conf.all.log_martians=1
+sysctl -w net.ipv4.conf.all.secure_redirects=0
+sysctl -w net.ipv4.conf.all.proxy_arp=0
+echo "net.ipv6.conf.all.forwarding=1" >> /etc/sysctl.d/99-openvpn-forward.conf
+echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
+
+$ipt --flush -t filter
+$ipt --flush -t nat
+$ipt --flush -t mangle
+$ipt --flush -t raw
+$ipt --delete-chain -t filter
+$ipt --delete-chain -t nat
+$ipt --delete-chain -t mangle
+$ipt --delete-chain -t raw
+$ip6t --flush -t filter
+$ip6t --flush -t nat
+$ip6t --flush -t mangle
+$ip6t --flush -t raw
+$ip6t --delete-chain -t filter
+$ip6t --delete-chain -t nat
+$ip6t --delete-chain -t mangle
+$ip6t --delete-chain -t raw
+
+$ipt -P INPUT DROP
+$ipt -P FORWARD DROP
+$ipt -P OUTPUT DROP
+
+$ip6t -P INPUT DROP
+$ip6t -P FORWARD DROP
+$ip6t -P OUTPUT DROP
+
+$ipt -N BAD-PACKETS
+$ipt -F BAD-PACKETS
+$ipt -A BAD-PACKETS -m state --state INVALID -j DROP
+$ipt -A BAD-PACKETS -p tcp -m tcp ! --syn -m conntrack --ctstate NEW -j DROP
+$ipt -A BAD-PACKETS -p tcp -m tcp --tcp-flags SYN,ACK SYN,ACK -m conntrack --ctstate NEW -j REJECT --reject-with tcp-reset
+$ipt -A BAD-PACKETS -p tcp -m tcp --tcp-option 64 -j DROP
+$ipt -A BAD-PACKETS -p tcp -m tcp --tcp-option 128 -j DROP
+$ipt -A BAD-PACKETS -m pkttype --pkt-type broadcast -j DROP
+$ipt -A BAD-PACKETS -m pkttype --pkt-type multicast -j DROP
+$ipt -N IPLOGGING
+$ipt -F IPLOGGING
+# $ipt -A IPLOGGING -j LOG --log-level info --log-prefix "IPLOGGING: "
+
+$ip6t -N BAD-PACKETS
+$ip6t -F BAD-PACKETS
+$ip6t -A BAD-PACKETS -m state --state INVALID -j DROP
+$ip6t -A BAD-PACKETS -p tcp -m tcp ! --syn -m conntrack --ctstate NEW -j DROP
+$ip6t -A BAD-PACKETS -p tcp -m tcp --tcp-flags SYN,ACK SYN,ACK -m conntrack --ctstate NEW -j REJECT --reject-with tcp-reset
+$ip6t -A BAD-PACKETS -p tcp -m tcp --tcp-option 64 -j DROP
+$ip6t -A BAD-PACKETS -p tcp -m tcp --tcp-option 128 -j DROP
+$ip6t -A BAD-PACKETS -m pkttype --pkt-type broadcast -j DROP
+$ip6t -A BAD-PACKETS -m pkttype --pkt-type multicast -j DROP
+$ip6t -N IPLOGGING
+$ip6t -F IPLOGGING
+# $ip6t -A IPLOGGING -j LOG --log-level info --log-prefix "IPLOGGING: "
+
+#$ipt -I OUTPUT -d 10.0.0.0/8 -j DROP
+#$ipt -I OUTPUT -d 172.16.0.0/12 -j DROP
+#$ipt -I OUTPUT -d 192.168.0.0/16 -j DROP
+#$ipt -I OUTPUT -d 100.64.0.0/10 -j DROP
+#$ipt -I OUTPUT -d 198.18.0.0/15 -j DROP
+#$ipt -I OUTPUT -d 169.254.0.0/16 -j DROP
+
+$ipt -I INPUT 1 -i lo -j ACCEPT
+$ipt -I OUTPUT 1 -o lo -j ACCEPT
+
+$ip6t -I INPUT 1 -i lo -j ACCEPT
+$ip6t -I OUTPUT 1 -o lo -j ACCEPT
+
+$ipt -A INPUT -p icmp --icmp-type 0 -j ACCEPT
+$ipt -A INPUT -p icmp --icmp-type 8 -j ACCEPT
+$ipt -A OUTPUT -p icmp -j ACCEPT
+
+$ip6t -A INPUT -p icmpv6 -j ACCEPT
+$ip6t -A OUTPUT -p icmpv6 -j ACCEPT
+
+$ipt -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+$ipt -A OUTPUT -m conntrack --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT
+
+$ip6t -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+$ip6t -A OUTPUT -m conntrack --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT
+
+# $ipt -A OUTPUT -p tcp -d 62.149.128.4,62.149.132.4,8.8.8.8,8.8.4.4 --dport 53 --sport 1024:65535
+# $ipt -A OUTPUT -p udp -d 62.149.128.4,62.149.132.4,8.8.8.8,8.8.4.4 --dport 53 --sport 1024:65535
+# $ip6t -A OUTPUT -p tcp -d 2001:4860:4860::8888 --dport 53 --sport 1024:65535
+# $ip6t -A OUTPUT -p udp -d 2001:4860:4860::8888 --dport 53 --sport 1024:65535
+
+$ipt -A INPUT -p tcp --dport 27127 -j ACCEPT
+$ipt -A INPUT -p tcp --dport 22 -j ACCEPT
+$ipt -A INPUT -p tcp --dport 443 -j ACCEPT
+
+$ip6t -A INPUT -p tcp --dport 27127 -j ACCEPT
+$ip6t -A INPUT -p tcp --dport 443 -j ACCEPT
+
+
+# OpenVPN
+$ipt -t nat -A POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to 157.90.144.63
+$ipt -I INPUT -p udp --dport 2727 -j ACCEPT
+$ipt -I FORWARD -s 10.8.0.0/24 -j ACCEPT
+$ipt -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+#$ipt -t nat -D POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to 157.90.144.63
+#$ipt -D INPUT -p udp --dport 2727 -j ACCEPT
+#$ipt -D FORWARD -s 10.8.0.0/24 -j ACCEPT
+#$ipt -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+$ip6t -A INPUT -p udp --dport 2727 -j ACCEPT
+$ip6t -t nat -A POSTROUTING -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:1194::/64 -j SNAT --to 2a01:4f8:c010:b955::1
+$ip6t -I FORWARD -s fddd:1194:1194:1194::/64 -j ACCEPT
+$ip6t -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+#$ip6t -t nat -D POSTROUTING -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:1194::/64 -j SNAT --to 2a01:4f8:c010:b955::1
+#$ip6t -D FORWARD -s fddd:1194:1194:1194::/64 -j ACCEPT
+#$ip6t -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT ' > /etc/network/if-up.d/iptables-rules
+chmod +x /etc/network/if-up.d/iptables-rules
+bash /etc/network/if-up.d/iptables-rules
+iptables-save  > /etc/iptables/rules.v4
+ip6tables-save > /etc/iptables/rules.v6
+
+
+
 #	if systemctl is-active --quiet firewalld.service; then
 #		# Using both permanent and not permanent rules to avoid a firewalld
 #		# reload.

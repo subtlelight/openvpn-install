@@ -256,7 +256,8 @@ LimitNPROC=infinity" > /etc/systemd/system/openvpn-server@server.service.d/disab
 	# Generate key for tls-crypt
 	openvpn --genkey --secret /etc/openvpn/server/tc.key
 	# Create the DH parameters file using the predefined ffdhe2048 group
-    ./easyrsa gen-dh 
+    ./easyrsa gen-dh
+	cp  /etc/openvpn/server/easy-rsa/pki/dh.pem /etc/openvpn/server/dh.pem
 
 #	echo '-----BEGIN DH PARAMETERS-----
 #MIIBCAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz
@@ -354,6 +355,8 @@ ipt=/sbin/iptables
 ip6t=/sbin/ip6tables
 "ip=$(ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}')"
 "ip6=$(ip -6 addr | grep 'inet6 [23]' | cut -d '/' -f 1 | grep -oE '([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}' | sed -n "$ip6_number"p)"
+"port=$(cat /etc/openvpn/server/server.conf | grep port | awk '{print $2}')"
+"protocol=$(cat /etc/openvpn/server/server.conf | grep proto | awk '{print $2}')"
 
 sysctl -w net.ipv4.tcp_syncookies=1
 sysctl -w net.ipv4.icmp_echo_ignore_broadcasts=1
@@ -452,27 +455,25 @@ $ip6t -A OUTPUT -m conntrack --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT
 $ipt -A INPUT -p tcp --dport 27127 -j ACCEPT
 $ipt -A INPUT -p tcp --dport 22 -j ACCEPT
 $ipt -A INPUT -p tcp --dport 443 -j ACCEPT
-$ipt -A INPUT -p tcp --dport "$port" -j ACCEPT
 
 $ip6t -A INPUT -p tcp --dport 27127 -j ACCEPT
 $ip6t -A INPUT -p tcp --dport 443 -j ACCEPT
-$ip6t -A INPUT -p tcp --dport "$port" -j ACCEPT
 
 
 # OpenVPN
-$ipt -t nat -A POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to 157.90.144.63
-$ipt -I INPUT -p udp --dport 2727 -j ACCEPT
+$ipt -t nat -A POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to "$ip"
+$ipt -I INPUT -p "protocol" --dport "$port" -j ACCEPT
 $ipt -I FORWARD -s 10.8.0.0/24 -j ACCEPT
 $ipt -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
-#$ipt -t nat -D POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to 157.90.144.63
-#$ipt -D INPUT -p udp --dport 2727 -j ACCEPT
+#$ipt -t nat -D POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j SNAT --to $ip
+#$ipt -D INPUT -p "protocol" --dport "$port" -j ACCEPT
 #$ipt -D FORWARD -s 10.8.0.0/24 -j ACCEPT
 #$ipt -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
-$ip6t -A INPUT -p udp --dport 2727 -j ACCEPT
-$ip6t -t nat -A POSTROUTING -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:1194::/64 -j SNAT --to 2a01:4f8:c010:b955::1
+$ip6t -A INPUT -p "protocol" --dport "$port" -j ACCEPT
+$ip6t -t nat -A POSTROUTING -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:1194::/64 -j SNAT --to $ip6
 $ip6t -I FORWARD -s fddd:1194:1194:1194::/64 -j ACCEPT
 $ip6t -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
-#$ip6t -t nat -D POSTROUTING -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:1194::/64 -j SNAT --to 2a01:4f8:c010:b955::1
+#$ip6t -t nat -D POSTROUTING -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:1194::/64 -j SNAT --to $ip6
 #$ip6t -D FORWARD -s fddd:1194:1194:1194::/64 -j ACCEPT
 #$ip6t -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT ' >> /etc/network/if-up.d/iptables-rules
 chmod +x /etc/network/if-up.d/iptables-rules

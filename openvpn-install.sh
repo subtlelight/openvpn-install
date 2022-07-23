@@ -451,9 +451,11 @@ $ip6t -A OUTPUT -m conntrack --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT
 $ipt -A INPUT -p tcp --dport 27127 -j ACCEPT
 $ipt -A INPUT -p tcp --dport 22 -j ACCEPT
 $ipt -A INPUT -p tcp --dport 443 -j ACCEPT
+$ipt -A INPUT -p tcp --dport $port -j ACCEPT
 
 $ip6t -A INPUT -p tcp --dport 27127 -j ACCEPT
 $ip6t -A INPUT -p tcp --dport 443 -j ACCEPT
+$ip6t -A INPUT -p tcp --dport $port -j ACCEPT
 
 
 # OpenVPN

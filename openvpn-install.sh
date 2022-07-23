@@ -349,7 +349,7 @@ verb 3
 
 mkdir /etc/network/if-up.d
 touch /etc/network/if-up.d/iptables-rules
-echo 'ipt=/sbin/iptables
+echo " ipt=/sbin/iptables
 ip6t=/sbin/ip6tables
 ip=$(ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}')
 ip6=$(ip -6 addr | grep 'inet6 [23]' | cut -d '/' -f 1 | grep -oE '([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}' | sed -n "$ip6_number"p)
@@ -471,7 +471,7 @@ $ip6t -I FORWARD -s fddd:1194:1194:1194::/64 -j ACCEPT
 $ip6t -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
 #$ip6t -t nat -D POSTROUTING -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:1194::/64 -j SNAT --to 2a01:4f8:c010:b955::1
 #$ip6t -D FORWARD -s fddd:1194:1194:1194::/64 -j ACCEPT
-#$ip6t -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT ' > /etc/network/if-up.d/iptables-rules
+#$ip6t -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT " > /etc/network/if-up.d/iptables-rules
 chmod +x /etc/network/if-up.d/iptables-rules
 bash /etc/network/if-up.d/iptables-rules
 iptables-save  > /etc/iptables/rules.v4

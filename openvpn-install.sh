@@ -351,9 +351,8 @@ mkdir /etc/network/if-up.d
 touch /etc/network/if-up.d/iptables-rules
 echo 'ipt=/sbin/iptables
 ip6t=/sbin/ip6tables
-#ip=$(ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}')
-ip=157.90.144.63
-#ip6=$(ip -6 addr | grep 'inet6 [23]' | cut -d '/' -f 1 | grep -oE '([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}' | sed -n "$ip6_numbe>
+ip=$(ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}')
+ip6=$(ip -6 addr | grep 'inet6 [23]' | cut -d '/' -f 1 | grep -oE '([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}' | sed -n "$ip6_number"p)
 
 sysctl -w net.ipv4.tcp_syncookies=1
 sysctl -w net.ipv4.icmp_echo_ignore_broadcasts=1

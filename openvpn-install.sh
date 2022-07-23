@@ -211,7 +211,7 @@ if [[ ! -e /etc/openvpn/server/server.conf ]]; then
 			echo "firewalld, which is required to manage routing tables, will also be installed."
 		elif [[ "$os" == "debian" || "$os" == "ubuntu" ]]; then
 			# iptables is way less invasive than firewalld so no warning is given
-			firewall="iptables iptables-persistent netfilter-persistent"
+			firewall="iptables"
 		fi
 	fi
 	read -n1 -r -p "Press any key to continue..."
@@ -223,7 +223,7 @@ LimitNPROC=infinity" > /etc/systemd/system/openvpn-server@server.service.d/disab
 	fi
 	if [[ "$os" = "debian" || "$os" = "ubuntu" ]]; then
 		apt-get update
-		apt-get install -y openvpn openssl ca-certificates $firewall 
+		apt-get install -y openvpn openssl ca-certificates iptables-persistent netfilter-persistent $firewall 
 	elif [[ "$os" = "centos" ]]; then
 		yum install -y epel-release
 		yum install -y openvpn openssl ca-certificates tar $firewall
@@ -352,8 +352,8 @@ touch /etc/network/if-up.d/iptables-rules
 echo " #!/bin/bash
 ipt=/sbin/iptables
 ip6t=/sbin/ip6tables
-ip=$(ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}')
-ip6=$(ip -6 addr | grep 'inet6 [23]' | cut -d '/' -f 1 | grep -oE '([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}' | sed -n "$ip6_number"p)
+"ip=$(ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}')"
+"ip6=$(ip -6 addr | grep 'inet6 [23]' | cut -d '/' -f 1 | grep -oE '([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}' | sed -n "$ip6_number"p)"
 
 sysctl -w net.ipv4.tcp_syncookies=1
 sysctl -w net.ipv4.icmp_echo_ignore_broadcasts=1
@@ -365,9 +365,9 @@ sysctl -w net.ipv4.conf.all.log_martians=1
 sysctl -w net.ipv4.conf.all.secure_redirects=0
 sysctl -w net.ipv4.conf.all.proxy_arp=0
 echo "net.ipv6.conf.all.forwarding=1" >> /etc/sysctl.d/99-openvpn-forward.conf
-echo 1 > /proc/sys/net/ipv6/conf/all/forwarding
+echo 1 > /proc/sys/net/ipv6/conf/all/forwarding" > /etc/network/if-up.d/iptables-rules
 
-$ipt --flush -t filter
+echo ' $ipt --flush -t filter
 $ipt --flush -t nat
 $ipt --flush -t mangle
 $ipt --flush -t raw
@@ -452,11 +452,11 @@ $ip6t -A OUTPUT -m conntrack --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT
 $ipt -A INPUT -p tcp --dport 27127 -j ACCEPT
 $ipt -A INPUT -p tcp --dport 22 -j ACCEPT
 $ipt -A INPUT -p tcp --dport 443 -j ACCEPT
-$ipt -A INPUT -p tcp --dport $port -j ACCEPT
+$ipt -A INPUT -p tcp --dport "$port" -j ACCEPT
 
 $ip6t -A INPUT -p tcp --dport 27127 -j ACCEPT
 $ip6t -A INPUT -p tcp --dport 443 -j ACCEPT
-$ip6t -A INPUT -p tcp --dport $port -j ACCEPT
+$ip6t -A INPUT -p tcp --dport "$port" -j ACCEPT
 
 
 # OpenVPN
@@ -474,7 +474,7 @@ $ip6t -I FORWARD -s fddd:1194:1194:1194::/64 -j ACCEPT
 $ip6t -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
 #$ip6t -t nat -D POSTROUTING -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:1194::/64 -j SNAT --to 2a01:4f8:c010:b955::1
 #$ip6t -D FORWARD -s fddd:1194:1194:1194::/64 -j ACCEPT
-#$ip6t -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT " > /etc/network/if-up.d/iptables-rules
+#$ip6t -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT ' >> /etc/network/if-up.d/iptables-rules
 chmod +x /etc/network/if-up.d/iptables-rules
 bash /etc/network/if-up.d/iptables-rules
 iptables-save  > /etc/iptables/rules.v4

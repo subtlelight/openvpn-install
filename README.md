@@ -23,6 +23,9 @@ If you want to show your appreciation, you can donate via [PayPal](https://www.p
 ## Client Config
 
 `sudo apt install openvpn`
+
 `sudo cp client.ovpn /etc/openvpn/client.conf`
+
 `sudo systemctl start openvpn@client`
+
 `sudo systemctl status openvpn@client`

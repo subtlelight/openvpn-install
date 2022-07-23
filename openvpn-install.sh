@@ -256,7 +256,7 @@ LimitNPROC=infinity" > /etc/systemd/system/openvpn-server@server.service.d/disab
 	# Generate key for tls-crypt
 	openvpn --genkey --secret /etc/openvpn/server/tc.key
 	# Create the DH parameters file using the predefined ffdhe2048 group
-    ./build-dh 
+    ./easyrsa gen-dh 
 
 #	echo '-----BEGIN DH PARAMETERS-----
 #MIIBCAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz
